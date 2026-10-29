@@ -7,9 +7,11 @@ A simple daily to-do reminder. Two parts:
 
 ## Task format
 
-`tasks.json` is a list of `{"task": "...", "when": "..."}`. `when` can be `daily`, `weekdays`, `weekends`, day names (`mon,wed,fri`), a date (`2026-11-03`), or a day of the month (`day:15`).
+Tasks are a JSON list (see `tasks.example.json`) of `{"task": "...", "when": "..."}`. `when` can be `daily`, `weekdays`, `weekends`, day names (`mon,wed,fri`), a date (`2026-11-03`), or a day of the month (`day:15`).
 
 ## Run it
+
+Copy `tasks.example.json` to `tasks.json` and edit it (`tasks.json` is git-ignored, so it never gets committed), then:
 
 ```
 python3 reminders.py
@@ -26,7 +28,7 @@ With neither set, the list prints to the terminal.
 
 ## Run it daily on GitHub
 
-`.github/workflows/daily-reminder.yml` runs the script every day at 13:00 UTC. Add the variables above under Settings > Secrets and variables > Actions, then edit `tasks.json` in the repo to change your tasks. The schedule is in UTC, so it shifts an hour when daylight saving ends.
+`.github/workflows/daily-reminder.yml` runs the script every day at 13:00 UTC. Add the variables above under Settings > Secrets and variables > Actions. Also add a secret named `TASKS_JSON` containing your task list (the same JSON as `tasks.example.json`). Secret values are hidden even in a public repo, so your tasks stay private. To change tasks, paste the new JSON into that secret. The schedule is in UTC, so it shifts an hour when daylight saving ends.
 
 ## Put the checklist on your phone (GitHub Pages)
 

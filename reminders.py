@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Daily reminder sender.
 
-Reads tasks from tasks.json and sends today's list by email and/or
-phone push (via ntfy.sh). Run it once a day with cron or Task Scheduler.
+Reads tasks from the TASKS_JSON environment variable (used on GitHub, as a
+secret) or, if that is not set, from a local tasks.json, and sends today's
+list by email and/or phone push (via ntfy.sh). Run it once a day with cron,
+Task Scheduler, or the included GitHub Actions workflow.
 
-tasks.json format (a list):
+Task format (a JSON list; see tasks.example.json):
 [
   {"task": "Take vitamins", "when": "daily"},
   {"task": "Take out trash", "when": "tue"},
@@ -53,8 +55,17 @@ def is_due(when: str, today: date) -> bool:
     return False
 
 
+def load_tasks() -> list[dict]:
+    raw = os.environ.get("TASKS_JSON", "").strip()
+    if raw:
+        return json.loads(raw)
+    if TASKS_FILE.exists():
+        return json.loads(TASKS_FILE.read_text())
+    sys.exit("No tasks found. Set TASKS_JSON or create tasks.json (see tasks.example.json).")
+
+
 def load_today(today: date) -> list[str]:
-    tasks = json.loads(TASKS_FILE.read_text())
+    tasks = load_tasks()
     return [t["task"] for t in tasks if is_due(t.get("when", "daily"), today)]
 
 

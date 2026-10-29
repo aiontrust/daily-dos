@@ -15,6 +15,7 @@ jobs:
           python-version: "3.12"
       - run: python reminders.py
         env:
+          TASKS_JSON: ${{ secrets.TASKS_JSON }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
