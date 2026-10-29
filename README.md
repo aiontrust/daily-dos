@@ -4,7 +4,6 @@ A daily checklist you install on your phone's home screen, with a push notificat
 
 - `docs/` is the app (served by GitHub Pages). Tasks and check-offs are saved on the phone only.
 - `worker/` is a small Cloudflare Worker that sends the daily push. It stores only your phone's push address, never your tasks. The notification text is built on the phone.
-- `reminders.py`, `tasks.example.json`, and `.github/workflows/daily-reminder.yml` are an older, optional way to get reminders through ntfy or email. You can ignore or delete them.
 
 ## 1. Publish the app
 
@@ -46,7 +45,3 @@ Notes:
 ```
 node worker/test.mjs
 ```
-
-## Optional: ntfy / email script
-
-`reminders.py` reads tasks from the `TASKS_JSON` environment variable or a local `tasks.json` (git-ignored; see `tasks.example.json`) and sends today's list through ntfy (`NTFY_TOPIC`) or email (`SMTP_*`, `EMAIL_TO`). The included workflow runs it daily on GitHub using Actions secrets.

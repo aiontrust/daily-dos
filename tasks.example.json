@@ -1,8 +1,0 @@
-[
-  {"task": "Take vitamins", "when": "daily"},
-  {"task": "Water plants", "when": "weekdays"},
-  {"task": "Take out trash", "when": "thu"},
-  {"task": "Team standup", "when": "mon,wed,fri"},
-  {"task": "Pay rent", "when": "day:1"},
-  {"task": "Call the dentist", "when": "2026-11-03"}
-]
