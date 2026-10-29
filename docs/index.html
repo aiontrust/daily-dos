@@ -369,17 +369,21 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
   var WHEN_RE = /^(daily|weekdays|weekends|anytime|day:([1-9]|[12]\d|3[01])|\d{4}-\d{2}-\d{2}|(sun|mon|tue|wed|thu|fri|sat)(,(sun|mon|tue|wed|thu|fri|sat))*)$/;
   function importTasks(list) {
     var seen = new Set(tasks.map(function (t) { return t.title.toLowerCase() + "|" + String(t.when).toLowerCase(); }));
-    var added = 0, skipped = 0, base = Date.now();
+    var added = 0, dupes = 0, invalid = 0, firstBad = "", base = Date.now();
     list.forEach(function (it) {
       var title = it && String(it.task || "").trim().slice(0, 120), when = it && String(it.when || "").trim().toLowerCase().replace(/\s+/g, "");
-      if (!title || !WHEN_RE.test(when)) { skipped++; return; }
+      if (!title || !WHEN_RE.test(when)) {
+        invalid++;
+        if (!firstBad) firstBad = !title ? "an entry has no \"task\"" : "\"" + title + "\" has an unreadable \"when\" (" + (when || "empty") + ")";
+        return;
+      }
       var k = title.toLowerCase() + "|" + when;
-      if (seen.has(k)) { skipped++; return; }
+      if (seen.has(k)) { dupes++; return; }
       seen.add(k); added++;
       var rec = { title: title, when: when, created: base + added, group: "Worker" };
       queueWrite(function () { return db.collection("tasks").add(rec); });
     });
-    return { added: added, skipped: skipped };
+    return { added: added, dupes: dupes, invalid: invalid, firstBad: firstBad, skipped: dupes + invalid };
   }
   $("importForm").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -387,8 +391,10 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     if (!db || !loadedTasks) { msg.textContent = "Your list hasn't loaded yet."; return; }
     try { list = JSON.parse($("importText").value); } catch (ex) { msg.textContent = "That isn't valid JSON."; return; }
     if (!Array.isArray(list)) { msg.textContent = "Paste a JSON list: [ {...}, {...} ]"; return; }
-    var r = importTasks(list);
-    msg.textContent = "Added " + r.added + ", skipped " + r.skipped + ".";
+    var r = importTasks(list), parts = ["Added " + r.added + "."];
+    if (r.dupes) parts.push(r.dupes + " already on your list.");
+    if (r.invalid) parts.push(r.invalid + " couldn't be read: " + r.firstBad + ".");
+    msg.textContent = parts.join(" ");
     if (r.added) $("importText").value = "";
   });
   var STARTER_KEY = "dailydos.workerStarter.v1";
