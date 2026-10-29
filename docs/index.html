@@ -136,7 +136,7 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
 
   <section id="starter" hidden>
     <div class="list" style="padding:16px">
-      <p class="status" style="margin:0 0 10px">Add your 18 project to-dos to the Worker list?</p>
+      <p class="status" style="margin:0 0 10px">Add your 25 project to-dos to the Worker list?</p>
       <div class="btns"><button class="primary" type="button" id="starterYes">Add to Worker</button><button class="secondary" type="button" id="starterNo">No thanks</button></div>
     </div>
   </section>
@@ -392,7 +392,7 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     if (r.added) $("importText").value = "";
   });
   var STARTER_KEY = "dailydos.workerStarter.v1";
-  var STARTER = [{"task":"Connect Ocultos payouts","when":"2026-10-30"},{"task":"Mailchimp signup page","when":"2026-11-01"},{"task":"Connect order forwarding","when":"2026-11-01"},{"task":"Set up Stripe Connect","when":"2026-11-02"},{"task":"BtV Workspace + Patreon","when":"2026-11-02"},{"task":"Texas sales tax permit","when":"2026-11-03"},{"task":"Aion domain renewal","when":"2026-11-19"},{"task":"Stripe Pro QR code","when":"2026-12-31"},{"task":"Open Cloudflare account","when":"anytime"},{"task":"Buy illustratorsart domains","when":"anytime"},{"task":"Rename Stripe + DBA","when":"anytime"},{"task":"File Assumed Name","when":"anytime"},{"task":"WOP: file or dissolve","when":"anytime"},{"task":"Texas LLC, then Chase","when":"anytime"},{"task":"Build store, link site","when":"anytime"},{"task":"Finish family invoice","when":"anytime"},{"task":"Pick site colors + fonts","when":"anytime"},{"task":"Re-record Spirit Cooking VO","when":"anytime"}];
+  var STARTER = [{"task":"Connect Ocultos payouts","when":"2026-10-30"},{"task":"Mailchimp signup page","when":"2026-11-01"},{"task":"Connect order forwarding","when":"2026-11-01"},{"task":"Set up Stripe Connect","when":"2026-11-02"},{"task":"BtV Workspace + Patreon","when":"2026-11-02"},{"task":"Texas sales tax permit","when":"2026-11-03"},{"task":"Aion domain renewal","when":"2026-11-19"},{"task":"Stripe Pro QR code","when":"2026-12-31"},{"task":"Open Cloudflare account","when":"anytime"},{"task":"Buy illustratorsart domains","when":"anytime"},{"task":"Rename Stripe + DBA","when":"anytime"},{"task":"File Assumed Name","when":"anytime"},{"task":"WOP: file or dissolve","when":"anytime"},{"task":"Texas LLC, then Chase","when":"anytime"},{"task":"Build store, link site","when":"anytime"},{"task":"Finish family invoice","when":"anytime"},{"task":"Pick site colors + fonts","when":"anytime"},{"task":"Re-record Spirit Cooking VO","when":"anytime"}},{"task":"IAS: Finish portal testrun as artist","when":"anytime"},{"task":"IAS: Attorney sign-off on Seller Agreement","when":"anytime"},{"task":"IAS: Invite David to portal","when":"anytime"},{"task":"IAS: Swap Stripe to live key","when":"anytime"},{"task":"IAS: Flip FinerWorks/Printful/Stannp to live","when":"anytime"},{"task":"IAS: Test order end to end","when":"anytime"},{"task":"IAS: Open artist signup","when":"anytime"}];
   function starterSeen() { try { return localStorage.getItem(STARTER_KEY) === "1"; } catch (e) { return true; } }
   function starterDone() { try { localStorage.setItem(STARTER_KEY, "1"); } catch (e) {} $("starter").hidden = true; }
   function maybeStarter() { if (db && loadedTasks && !starterSeen()) $("starter").hidden = false; }
