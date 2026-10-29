@@ -3,7 +3,7 @@
 A simple daily to-do reminder. Two parts:
 
 - `reminders.py` + `tasks.json`: a script that picks the tasks due today and sends them to your phone (via [ntfy](https://ntfy.sh)) and/or email.
-- `web/index.html`: a checklist page with a done tracker. It is written for claude.ai Artifacts (it uses the artifact `db` capability for storage), so it is not a standalone site.
+- `docs/`: a checklist web app with a done tracker, installable to a phone home screen. It saves to the device's browser storage, so it works offline and needs no server.
 
 ## Task format
 
@@ -27,3 +27,11 @@ With neither set, the list prints to the terminal.
 ## Run it daily on GitHub
 
 `.github/workflows/daily-reminder.yml` runs the script every day at 13:00 UTC. Add the variables above under Settings > Secrets and variables > Actions, then edit `tasks.json` in the repo to change your tasks. The schedule is in UTC, so it shifts an hour when daylight saving ends.
+
+## Put the checklist on your phone (GitHub Pages)
+
+1. In the repo, go to Settings > Pages. Under Build and deployment, choose Deploy from a branch, pick `main` and the `/docs` folder, and save.
+2. Open `https://<your-username>.github.io/daily-dos/` on your phone.
+3. iPhone: Share > Add to Home Screen. Android: menu > Install app or Add to Home screen.
+
+Tasks and check-offs are stored on that device only. A home screen app and the same page in a browser tab keep separate lists, and nothing syncs between devices. The page can't push notifications by itself, so use the daily workflow above for the morning reminder.
