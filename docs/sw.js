@@ -1,4 +1,4 @@
-const CACHE = "daily-dos-v2";
+const CACHE = "daily-dos-v3";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -44,7 +44,7 @@ async function showToday() {
   if (st && Array.isArray(st.tasks)) {
     const now = new Date(), done = new Set((st.done && st.done[iso(now)]) || []);
     const left = st.tasks.filter((t) => isDue(t.when, now) && !done.has(t.id)).map((t) => t.title);
-    if (!left.length) body = "Nothing left to do today.";
+    if (!left.length) { title = "All clear"; body = "Nothing left to do today."; }
     else {
       title = "To do today (" + left.length + ")";
       body = left.slice(0, 6).map((t) => "• " + t).join("\n") + (left.length > 6 ? "\n+" + (left.length - 6) + " more" : "");
