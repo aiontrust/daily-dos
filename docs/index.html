@@ -113,6 +113,11 @@ button { font: 600 0.95rem var(--body); cursor: pointer; border-radius: 8px; bor
 .when { font: 400 0.78rem var(--mono); color: var(--muted); }
 .stack { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .err { color: var(--danger); font-size: 0.9rem; margin: 0; min-height: 1.2em; }
+
+.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.status { margin: 0; font-size: 0.95rem; }
+.hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 </style>
 <style>
@@ -160,6 +165,25 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
       <label class="f" id="domBox" hidden><span>Day of month</span><input type="number" id="newDom" min="1" max="31" value="1"></label>
       <p class="err" id="formErr" role="alert"></p>
       <button class="primary" type="submit">Add task</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="remH" id="remSection">
+    <h2 id="remH">Morning reminder</h2>
+    <form id="remForm" autocomplete="off">
+      <p class="status" id="pushStatus" role="status">Off</p>
+      <label class="f"><span>Send at</span>
+        <select id="pushHour"></select>
+      </label>
+      <label class="f"><span>Worker address</span><input type="text" id="pushUrl" inputmode="url" autocapitalize="none" placeholder="https://daily-dos-push.your-name.workers.dev"></label>
+      <label class="f"><span>Setup key</span><input type="password" id="pushKey" autocapitalize="none"></label>
+      <p class="hint">On iPhone, add this page to your Home Screen and open it from there first. Requires iOS 16.4 or later.</p>
+      <p class="err" id="pushErr" role="alert"></p>
+      <div class="btns">
+        <button class="primary" type="submit" id="pushOn">Turn on reminders</button>
+        <button class="secondary" type="button" id="pushTest" hidden>Send a test</button>
+        <button class="secondary" type="button" id="pushOff" hidden>Turn off</button>
+      </div>
     </form>
   </section>
 
@@ -357,19 +381,113 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     };
   }
 
+  // Copy tasks and check-offs where the service worker can read them for the morning notification.
+  function mirror() {
+    if (!loadedTasks) return;
+    try {
+      var req = indexedDB.open("dailydos", 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore("kv"); };
+      req.onsuccess = function () {
+        try {
+          var tx = req.result.transaction("kv", "readwrite");
+          tx.objectStore("kv").put({ tasks: tasks, done: done, at: Date.now() }, "state");
+          tx.oncomplete = function () { req.result.close(); };
+        } catch (e) {}
+      };
+    } catch (e) {}
+  }
+
   render();
   (window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null)).then(function (handle) {
     db = handle || localDb();
     db.collection("tasks").orderBy("created").onSnapshot(function (snap) {
       tasks = snap.docs.map(function (d) { var x = d.data() || {}; return { id: d.id, title: String(x.title || ""), when: x.when || "daily" }; });
-      loadedTasks = true; render();
+      loadedTasks = true; render(); mirror();
     }, function () { loadedTasks = true; render(); });
     db.collection("done").orderBy("date", "desc").limit(14).onSnapshot(function (snap) {
       var next = {};
       snap.docs.forEach(function (d) { var x = d.data() || {}; next[d.id] = Array.isArray(x.ids) ? x.ids : []; });
-      done = next; loadedDone = true; render();
+      done = next; loadedDone = true; render(); mirror();
     }, function () { loadedDone = true; });
   }).catch(function () { db = localDb(); render(); });
   if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) navigator.serviceWorker.register("sw.js").catch(function () {});
+})();
+</script>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  if (window.claude) { $("remSection").hidden = true; return; }
+  var KEY = "dailydos.push";
+  function cfg() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+  function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {} }
+  function hourLabel(h) { return (h % 12 || 12) + (h < 12 ? " AM" : " PM"); }
+  [6, 7, 8, 9, 10, 12, 17, 20].forEach(function (h) {
+    var o = document.createElement("option"); o.value = h; o.textContent = hourLabel(h); $("pushHour").append(o);
+  });
+  var c = cfg();
+  $("pushHour").value = String(c.hour != null ? c.hour : 8);
+  if (c.url) $("pushUrl").value = c.url;
+  if (c.key) $("pushKey").value = c.key;
+  function err(m) { $("pushErr").textContent = m || ""; }
+  function supported() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+  function b64ToBytes(b) {
+    var s = atob(b.replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, function (ch) { return ch.charCodeAt(0); });
+  }
+  function api(path, body) {
+    var conf = cfg();
+    return fetch(conf.url + path, { method: "POST", headers: { "content-type": "application/json", "x-setup-key": conf.key }, body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || "The Worker returned " + r.status + "."); return j; }); });
+  }
+  function show(on) {
+    $("pushOn").hidden = on; $("pushTest").hidden = !on; $("pushOff").hidden = !on;
+    var conf = cfg();
+    $("pushStatus").textContent = on ? "On. Daily at " + hourLabel(conf.hour != null ? conf.hour : 8) + "." : "Off";
+  }
+  function refresh() {
+    if (!supported()) { show(false); return; }
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); })
+      .then(function (sub) { show(!!sub && cfg().enabled === true); }).catch(function () { show(false); });
+  }
+
+  $("remForm").addEventListener("submit", function (e) {
+    e.preventDefault(); err("");
+    var url = $("pushUrl").value.trim().replace(/\/+$/, ""), key = $("pushKey").value.trim(), hour = Number($("pushHour").value);
+    if (!supported()) { err("Push isn't available here. On iPhone, add the app to your Home Screen and open it from there (iOS 16.4 or later)."); return; }
+    if (url.indexOf("https://") !== 0) { err("Enter your Worker address, starting with https://"); return; }
+    if (!key) { err("Enter your setup key."); return; }
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    save({ url: url, key: key, hour: hour, enabled: false });
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== "granted") throw new Error("Notifications are blocked. Allow them for this app in your phone's Settings, then try again.");
+      return navigator.serviceWorker.ready;
+    }).then(function (reg) {
+      return fetch(url + "/vapid-key").then(function (r) { return r.json(); }).then(function (j) {
+        return reg.pushManager.getSubscription().then(function (existing) {
+          return existing || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(j.publicKey) });
+        });
+      });
+    }).then(function (sub) {
+      return api("/subscribe", { subscription: sub.toJSON(), tz: tz, hour: hour });
+    }).then(function () {
+      save({ url: url, key: key, hour: hour, enabled: true }); show(true);
+    }).catch(function (ex) { err(ex && ex.message ? ex.message : "Couldn't turn on reminders."); });
+  });
+
+  $("pushTest").addEventListener("click", function () {
+    err("");
+    api("/test").then(function () { $("pushStatus").textContent = "Test sent. It should arrive in a few seconds."; })
+      .catch(function (ex) { err(ex.message); });
+  });
+  $("pushOff").addEventListener("click", function () {
+    err("");
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return;
+      var info = sub.toJSON();
+      return api("/unsubscribe", { subscription: info }).catch(function () {}).then(function () { return sub.unsubscribe(); });
+    }).then(function () { var conf = cfg(); conf.enabled = false; save(conf); show(false); })
+      .catch(function (ex) { err(ex && ex.message ? ex.message : "Couldn't turn off reminders."); });
+  });
+  refresh();
 })();
 </script>

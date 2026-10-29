@@ -1,0 +1,14 @@
+name = "daily-dos-push"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["0 * * * *"]   # hourly; the Worker decides who is due in their own time zone
+
+[vars]
+ALLOWED_ORIGIN = "https://aiontrust.github.io"
+VAPID_SUBJECT = "https://aiontrust.github.io/daily-dos/"
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "REPLACE_WITH_KV_ID"   # from: npx wrangler kv namespace create SUBS
