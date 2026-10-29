@@ -112,6 +112,8 @@ button { font: 600 0.95rem var(--body); cursor: pointer; border-radius: 8px; bor
 .ghost:hover { color: var(--danger); }
 .when { font: 400 0.78rem var(--mono); color: var(--muted); }
 .stack { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.grp { padding: 10px 16px 6px; font: 500 0.72rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+textarea { font: 400 0.85rem var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; min-height: 90px; }
 .err { color: var(--danger); font-size: 0.9rem; margin: 0; min-height: 1.2em; }
 
 .secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
@@ -131,6 +133,13 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     <p class="count" id="count">Loading your list…</p>
     <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
   </header>
+
+  <section id="starter" hidden>
+    <div class="list" style="padding:16px">
+      <p class="status" style="margin:0 0 10px">Add your 25 project to-dos to the Worker list?</p>
+      <div class="btns"><button class="primary" type="button" id="starterYes">Add to Worker</button><button class="secondary" type="button" id="starterNo">No thanks</button></div>
+    </div>
+  </section>
 
   <section aria-labelledby="todayH">
     <h2 id="todayH">To do today</h2>
@@ -165,6 +174,12 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
       <label class="f" id="domBox" hidden><span>Day of month</span><input type="number" id="newDom" min="1" max="31" value="1"></label>
       <p class="err" id="formErr" role="alert"></p>
       <button class="primary" type="submit">Add task</button>
+    </form>
+    <form id="importForm" autocomplete="off">
+      <label class="f"><span>Import to Worker</span><textarea id="importText" placeholder='[{"task":"Call bank","when":"anytime"}]'></textarea></label>
+      <p class="hint">JSON list of {"task","when"}. When: daily, weekdays, weekends, mon,wed,fri, day:N, YYYY-MM-DD, or anytime (shows until checked off).</p>
+      <p class="err" id="importMsg" role="status"></p>
+      <button class="primary" type="submit">Import</button>
     </form>
   </section>
 
@@ -207,7 +222,7 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     var parts = String(when || "daily").split(",");
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i].trim().toLowerCase(), g = d.getDay();
-      if (p === "daily") return true;
+      if (p === "daily" || p === "anytime") return true;
       if (p === "weekdays" && g >= 1 && g <= 5) return true;
       if (p === "weekends" && (g === 0 || g === 6)) return true;
       if (p === DAYS[g]) return true;
@@ -219,6 +234,7 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
   function describe(when) {
     var w = String(when || "daily").toLowerCase();
     if (w === "daily") return "Every day";
+    if (w === "anytime") return "Anytime";
     if (w === "weekdays") return "Weekdays";
     if (w === "weekends") return "Weekends";
     if (w.indexOf("day:") === 0) return "Day " + w.slice(4) + " of each month";
@@ -243,7 +259,8 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     if (!loadedTasks) return;
 
     var doneToday = new Set(done[today] || []);
-    var dueToday = tasks.filter(function (t) { return isDue(t.when, now); });
+    var dueToday = tasks.filter(function (t) { return isDue(t.when, now) && (!t.completed || t.completed === today); });
+    dueToday = dueToday.filter(function (t) { return t.group !== "Worker"; }).concat(dueToday.filter(function (t) { return t.group === "Worker"; }));
     var nDone = dueToday.filter(function (t) { return doneToday.has(t.id); }).length;
 
     $("count").textContent = dueToday.length ? nDone + " of " + dueToday.length + " done" : "Nothing due today";
@@ -254,18 +271,21 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     if (!dueToday.length) {
       ul.replaceChildren(el("li", "empty", tasks.length ? "Nothing is scheduled for today." : "No tasks yet. Add your first one below."));
     } else {
-      ul.replaceChildren.apply(ul, dueToday.map(function (t) {
+      var lastGrp = false;
+      ul.replaceChildren.apply(ul, [].concat.apply([], dueToday.map(function (t) {
+        var out = [];
+        if (t.group === "Worker" && !lastGrp) { lastGrp = true; out.push(el("li", "grp", "Worker")); }
         var li = el("li"), row = el("div", "row" + (doneToday.has(t.id) ? " done" : "")), lab = el("label");
         var cb = el("input", "chk"); cb.type = "checkbox"; cb.checked = doneToday.has(t.id); cb.id = "chk-" + t.id;
         cb.addEventListener("change", function () { toggle(t.id, today); });
-        lab.append(cb, el("span", "t", t.title)); row.append(lab); li.append(row); return li;
-      }));
+        lab.append(cb, el("span", "t", t.title)); row.append(lab); li.append(row); out.push(li); return out;
+      })));
     }
 
     var week = $("week"), cells = [];
     for (var i = 6; i >= 0; i--) {
       var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), key = iso(d);
-      var due = tasks.filter(function (t) { return isDue(t.when, d); });
+      var due = tasks.filter(function (t) { return t.when !== "anytime" && isDue(t.when, d); });
       var ds = new Set(done[key] || []), n = due.filter(function (t) { return ds.has(t.id); }).length;
       var cell = el("div", "day" + (i === 0 ? " today" : "")), col = el("div", "col"), fill = el("i");
       fill.style.height = due.length ? Math.round(100 * n / due.length) + "%" : "0%";
@@ -280,7 +300,7 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     else {
       all.replaceChildren.apply(all, tasks.map(function (t) {
         var li = el("li"), row = el("div", "row"), stack = el("div", "stack");
-        stack.append(el("span", "t", t.title), el("span", "when", describe(t.when)));
+        stack.append(el("span", "t", t.title), el("span", "when", (t.group === "Worker" ? "Worker · " : "") + describe(t.when) + (t.completed ? " · done" : "")));
         var del = el("button", "ghost", "Remove"); del.type = "button";
         del.setAttribute("aria-label", "Remove " + t.title);
         del.addEventListener("click", function () { removeTask(t.id); });
@@ -297,7 +317,14 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     var cur = new Set(done[date] || []);
     if (cur.has(id)) cur.delete(id); else cur.add(id);
     var ids = Array.from(cur);
-    done[date] = ids; render();
+    done[date] = ids;
+    var t = tasks.filter(function (x) { return x.id === id; })[0];
+    if (t && t.when === "anytime") {
+      t.completed = cur.has(id) ? date : null;
+      var rec = { title: t.title, when: t.when, created: t.created, group: t.group || null, completed: t.completed };
+      queueWrite(function () { return db.doc("tasks/" + id).set(rec); });
+    }
+    render();
     queueWrite(function () { return db.doc("done/" + date).set({ date: date, ids: ids }); });
   }
   function removeTask(id) {
@@ -337,6 +364,44 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
     $("newTitle").value = ""; $("newTitle").focus();
   });
 
+
+  // Import a JSON list of {task, when} into the Worker group. Skips duplicates (same task + when); never removes anything.
+  var WHEN_RE = /^(daily|weekdays|weekends|anytime|day:([1-9]|[12]\d|3[01])|\d{4}-\d{2}-\d{2}|(sun|mon|tue|wed|thu|fri|sat)(,(sun|mon|tue|wed|thu|fri|sat))*)$/;
+  function importTasks(list) {
+    var seen = new Set(tasks.map(function (t) { return t.title.toLowerCase() + "|" + String(t.when).toLowerCase(); }));
+    var added = 0, skipped = 0, base = Date.now();
+    list.forEach(function (it) {
+      var title = it && String(it.task || "").trim().slice(0, 120), when = it && String(it.when || "").trim().toLowerCase().replace(/\s+/g, "");
+      if (!title || !WHEN_RE.test(when)) { skipped++; return; }
+      var k = title.toLowerCase() + "|" + when;
+      if (seen.has(k)) { skipped++; return; }
+      seen.add(k); added++;
+      var rec = { title: title, when: when, created: base + added, group: "Worker" };
+      queueWrite(function () { return db.collection("tasks").add(rec); });
+    });
+    return { added: added, skipped: skipped };
+  }
+  $("importForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var msg = $("importMsg"), list;
+    if (!db || !loadedTasks) { msg.textContent = "Your list hasn't loaded yet."; return; }
+    try { list = JSON.parse($("importText").value); } catch (ex) { msg.textContent = "That isn't valid JSON."; return; }
+    if (!Array.isArray(list)) { msg.textContent = "Paste a JSON list: [ {...}, {...} ]"; return; }
+    var r = importTasks(list);
+    msg.textContent = "Added " + r.added + ", skipped " + r.skipped + ".";
+    if (r.added) $("importText").value = "";
+  });
+  var STARTER_KEY = "dailydos.workerStarter.v1";
+  var STARTER = [{"task":"Connect Ocultos payouts","when":"2026-10-30"},{"task":"Mailchimp signup page","when":"2026-11-01"},{"task":"Connect order forwarding","when":"2026-11-01"},{"task":"Set up Stripe Connect","when":"2026-11-02"},{"task":"BtV Workspace + Patreon","when":"2026-11-02"},{"task":"Texas sales tax permit","when":"2026-11-03"},{"task":"Aion domain renewal","when":"2026-11-19"},{"task":"Stripe Pro QR code","when":"2026-12-31"},{"task":"Open Cloudflare account","when":"anytime"},{"task":"Buy illustratorsart domains","when":"anytime"},{"task":"Rename Stripe + DBA","when":"anytime"},{"task":"File Assumed Name","when":"anytime"},{"task":"WOP: file or dissolve","when":"anytime"},{"task":"Texas LLC, then Chase","when":"anytime"},{"task":"Build store, link site","when":"anytime"},{"task":"Finish family invoice","when":"anytime"},{"task":"Pick site colors + fonts","when":"anytime"},{"task":"Re-record Spirit Cooking VO","when":"anytime"},{"task":"IAS: Finish portal testrun as artist","when":"anytime"},{"task":"IAS: Attorney sign-off on Seller Agreement","when":"anytime"},{"task":"IAS: Invite David to portal","when":"anytime"},{"task":"IAS: Swap Stripe to live key","when":"anytime"},{"task":"IAS: Flip FinerWorks/Printful/Stannp to live","when":"anytime"},{"task":"IAS: Test order end to end","when":"anytime"},{"task":"IAS: Open artist signup","when":"anytime"}];
+  function starterSeen() { try { return localStorage.getItem(STARTER_KEY) === "1"; } catch (e) { return true; } }
+  function starterDone() { try { localStorage.setItem(STARTER_KEY, "1"); } catch (e) {} $("starter").hidden = true; }
+  function maybeStarter() { if (db && loadedTasks && !starterSeen()) $("starter").hidden = false; }
+  $("starterYes").addEventListener("click", function () {
+    if (!db || !loadedTasks) return;
+    var r = importTasks(STARTER); starterDone();
+    $("count").textContent = "Added " + r.added + " to Worker" + (r.skipped ? ", skipped " + r.skipped : "") + ".";
+  });
+  $("starterNo").addEventListener("click", starterDone);
 
   // Saves to this device's localStorage when Claude's storage isn't available (GitHub Pages, home screen app).
   function localDb() {
@@ -401,8 +466,8 @@ body { padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: 
   (window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null)).then(function (handle) {
     db = handle || localDb();
     db.collection("tasks").orderBy("created").onSnapshot(function (snap) {
-      tasks = snap.docs.map(function (d) { var x = d.data() || {}; return { id: d.id, title: String(x.title || ""), when: x.when || "daily" }; });
-      loadedTasks = true; render(); mirror();
+      tasks = snap.docs.map(function (d) { var x = d.data() || {}; return { id: d.id, title: String(x.title || ""), when: x.when || "daily", created: x.created || 0, group: x.group || null, completed: x.completed || null }; });
+      loadedTasks = true; render(); mirror(); maybeStarter();
     }, function () { loadedTasks = true; render(); });
     db.collection("done").orderBy("date", "desc").limit(14).onSnapshot(function (snap) {
       var next = {};

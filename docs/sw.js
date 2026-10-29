@@ -1,4 +1,4 @@
-const CACHE = "daily-dos-v3";
+const CACHE = "daily-dos-v4";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -14,7 +14,7 @@ const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.g
 function isDue(when, d) {
   for (const raw of String(when || "daily").split(",")) {
     const p = raw.trim().toLowerCase(), g = d.getDay();
-    if (p === "daily") return true;
+    if (p === "daily" || p === "anytime") return true;
     if (p === "weekdays" && g >= 1 && g <= 5) return true;
     if (p === "weekends" && (g === 0 || g === 6)) return true;
     if (p === DAYS[g] || p === iso(d)) return true;
@@ -43,7 +43,7 @@ async function showToday() {
   let title = "Daily Do's", body = "Open the app to see today's list.";
   if (st && Array.isArray(st.tasks)) {
     const now = new Date(), done = new Set((st.done && st.done[iso(now)]) || []);
-    const left = st.tasks.filter((t) => isDue(t.when, now) && !done.has(t.id)).map((t) => t.title);
+    const left = st.tasks.filter((t) => isDue(t.when, now) && !t.completed && !done.has(t.id)).map((t) => t.title);
     if (!left.length) { title = "All clear"; body = "Nothing left to do today."; }
     else {
       title = "To do today (" + left.length + ")";
