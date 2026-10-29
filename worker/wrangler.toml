@@ -11,4 +11,4 @@ VAPID_SUBJECT = "https://aiontrust.github.io/daily-dos/"
 
 [[kv_namespaces]]
 binding = "SUBS"
-id = "REPLACE_WITH_KV_ID"   # from: npx wrangler kv namespace create SUBS
+id = "1d2088c6323f48f2aa827b8ed2e40e46"   # from: npx wrangler kv namespace create SUBS
